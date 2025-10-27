@@ -2,7 +2,8 @@ import time
 import os
 import math
 import subprocess
-
+//Example song : Fashion by CORTIS
+//Color coding here
 colors = {
     "Seonghyeon": "[93m",
     "James": "[92m",
@@ -12,7 +13,7 @@ colors = {
     "All": "[96m",
     "Default": "[0m"
 }
-
+//.lrc text here
 lyrics = [
     (6.041, "nae ti, 5 bucks", "Keonho"),
     (7.492, "bajineun, manwon", "Keonho"),
@@ -115,7 +116,7 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def display_lyrics():
-    flac_file_path = "/home/giseru/03. FaSHioN.flac"
+    flac_file_path = "/audio/path/here"
 
     input("Press Enter to start...")
     

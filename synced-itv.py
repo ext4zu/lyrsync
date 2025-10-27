@@ -4,15 +4,17 @@ synced-lyrics-v2.py
 
 Interactive version (no command-line flags).
 Flow:
-  1) Prompt for audio file path (required)
-  2) Prompt for .lrc file path (required)
+  1) Prompt for audio file path (required) — supports drag-and-drop paths (quoted or escaped).
+  2) Prompt for .lrc file path (required) — supports drag-and-drop paths (quoted or escaped).
   3) Prompt for how many times to play (default 1). Enter 0 for infinite loop.
   4) Prompt for audio player (default 'play' - sox). Common alternatives: ffplay, mpv
 
-Behavior:
-  - Displays centered, timestamp-synced lyrics from .lrc while playing audio.
-  - Waits for the audio process to finish before starting the next loop iteration or exiting.
-  - Ctrl+C will terminate any running audio and exit cleanly.
+Adjustments in this v2:
+- Accepts drag-and-drop style paths that may be wrapped in single or double quotes, or contain escaped spaces.
+- Expands ~ and environment variables.
+- If a file is not found, the script immediately prompts the user to re-enter the path (no yes/no confirmation).
+- Still waits for the audio process to finish before looping/exiting.
+- Ctrl+C will terminate any running audio and exit cleanly.
 """
 
 import os
@@ -22,6 +24,7 @@ import time
 import math
 import signal
 import subprocess
+import shlex
 
 TIMESTAMP_RE = re.compile(r'\[(\d+):([0-5]?\d(?:\.\d+)?)\]')
 
@@ -133,19 +136,48 @@ def display_loop(lyrics_entries):
 
 
 def prompt_file_path(prompt_msg):
+    """
+    Prompt for a file path from the user. Accepts drag-and-drop formats:
+    - Paths wrapped in single or double quotes: '/path/to/file' or "/path/to/file"
+    - Escaped spaces (e.g., /path/to/My\\ Song.mp3)
+    - Environment vars and ~ are expanded.
+    If the file isn't found, re-prompt immediately (no yes/no).
+    """
     while True:
-        p = input(prompt_msg).strip()
-        if not p:
+        raw = input(prompt_msg)
+        if raw is None:
+            raw = ''
+        raw = raw.strip()
+        if raw == '':
             print("Path cannot be empty. Please try again.")
             continue
+
+        # shlex.split handles quoted strings and escaped spaces properly.
+        # If user pasted multiple tokens, take the first parsed token as the file path.
+        try:
+            tokens = shlex.split(raw)
+        except Exception:
+            # fallback: naive strip of surrounding quotes
+            tokens = [raw.strip('"').strip("'")]
+
+        p = tokens[0] if tokens else raw
+
+        # Remove surrounding single/double quotes if any remain
+        if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+            p = p[1:-1]
+
+        # Expand ~ and environment variables
+        p = os.path.expanduser(os.path.expandvars(p))
+
+        if p == '':
+            print("Path cannot be empty. Please try again.")
+            continue
+
         if not os.path.isfile(p):
             print(f"File not found: {p}")
-            try_again = input("Try again? (Y/n): ").strip().lower()
-            if try_again in ('', 'y', 'yes'):
-                continue
-            else:
-                print("Exiting.")
-                sys.exit(1)
+            print("Please re-enter the path.")
+            continue
+
         return p
 
 
@@ -185,10 +217,10 @@ def sigint_handler_factory(current_proc_container):
 
 
 def main():
-    print("synced-lyrics v2 - interactive mode (no command-line flags)\n")
+    print("synced-lyrics interactive\n")
 
-    audio_path = prompt_file_path("Enter audio file path: ")
-    lrc_path = prompt_file_path("Enter .lrc file path: ")
+    audio_path = prompt_file_path("Enter audio file path (drag file here or type path): ")
+    lrc_path = prompt_file_path("Enter .lrc file path (drag file here or type path): ")
 
     lyrics = parse_lrc(lrc_path)
     loop_count = prompt_loop_count()
@@ -206,7 +238,7 @@ def main():
 
     try:
         while True:
-            # build actual command (rebuild to include the audio_path in case user used a wrapper)
+            # build actual command (rebuild to include the audio_path)
             player_cmd = build_player_cmd(player_choice, audio_path)
 
             audio_proc = play_audio(player_cmd)

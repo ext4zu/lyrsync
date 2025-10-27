@@ -8,6 +8,7 @@ import math
 import signal
 import subprocess
 import shlex
+from shutil import which
 
 TIMESTAMP_RE = re.compile(r'\[(\d+):([0-5]?\d(?:\.\d+)?)\]')
 
@@ -64,12 +65,39 @@ def center_display(text):
 
 def build_player_cmd(player, audio_path):
     player = (player or 'play').strip()
+    # Build command lists for known players
     if player == 'ffplay':
         return ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_path]
     elif player == 'mpv':
         return ['mpv', '--no-video', '--really-quiet', audio_path]
+    elif player == 'afplay':
+        return ['afplay', audio_path]
+    elif player == 'cvlc':
+        return ['cvlc', '--play-and-exit', '--no-video', audio_path]
+    elif player == 'vlc':
+        return ['vlc', '--intf', 'dummy', '--play-and-exit', '--no-video', audio_path]
+    elif player == 'mplayer':
+        return ['mplayer', '-really-quiet', '-nosound', audio_path] if False else ['mplayer', '-really-quiet', '-vo', 'null', audio_path]
     else:
+        # default to sox 'play'
         return ['play', audio_path]
+
+
+def detect_player(preferred=None):
+    """
+    Auto-detect an available player from a list of common players.
+    preferred: optional list or tuple of player names in order to prefer.
+    Returns the name of the first available player, or None if none found.
+    """
+    candidates = (
+        (preferred if isinstance(preferred, (list, tuple)) else None)
+        or ['mpv', 'ffplay', 'afplay', 'cvlc', 'vlc', 'mplayer', 'play']
+    )
+
+    for p in candidates:
+        if which(p):
+            return p
+    return None
 
 
 def play_audio(player_cmd):
@@ -189,11 +217,6 @@ def prompt_loop_count():
             print("Invalid number. Please enter an integer (e.g., 1, 2, 0).")
 
 
-def prompt_player_choice():
-    v = input("Audio player to use [play] (options: play, ffplay, mpv): ").strip()
-    return v or 'play'
-
-
 def sigint_handler_factory(current_proc_container):
     def handler(signum, frame):
         p = current_proc_container.get('proc')
@@ -215,11 +238,17 @@ def main():
 
     lyrics = parse_lrc(lrc_path)
     loop_count = prompt_loop_count()
-    player_choice = prompt_player_choice()
+
+    # Auto-detect an available player instead of prompting the user
+    player_choice = detect_player()
+    if player_choice:
+        print(f"Using audio player: {player_choice}")
+    else:
+        print("Warning: No known audio player detected in PATH. Will attempt to use 'play' (sox) and may fail.")
+        player_choice = 'play'
 
     player_cmd_template = build_player_cmd(player_choice, audio_path)
 
-    from shutil import which
     if which(player_cmd_template[0]) is None:
         print(f"Warning: player '{player_cmd_template[0]}' not found in PATH. The script will attempt to run it, but it may fail.")
 

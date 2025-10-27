@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""
+synced-lyrics-v2.py
+
+Interactive version (no command-line flags).
+Flow:
+  1) Prompt for audio file path (required)
+  2) Prompt for .lrc file path (required)
+  3) Prompt for how many times to play (default 1). Enter 0 for infinite loop.
+  4) Prompt for audio player (default 'play' - sox). Common alternatives: ffplay, mpv
+
+Behavior:
+  - Displays centered, timestamp-synced lyrics from .lrc while playing audio.
+  - Waits for the audio process to finish before starting the next loop iteration or exiting.
+  - Ctrl+C will terminate any running audio and exit cleanly.
+"""
+
+import os
+import re
+import sys
+import time
+import math
+import signal
+import subprocess
+
+TIMESTAMP_RE = re.compile(r'\[(\d+):([0-5]?\d(?:\.\d+)?)\]')
+
+
+def parse_lrc(lrc_path):
+    entries = []
+    try:
+        with open(lrc_path, 'r', encoding='utf-8') as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    continue
+                timestamps = TIMESTAMP_RE.findall(line)
+                if not timestamps:
+                    continue
+                text = TIMESTAMP_RE.sub('', line).strip()
+                if not text:
+                    continue
+                for m in timestamps:
+                    minutes = int(m[0])
+                    seconds = float(m[1])
+                    total = minutes * 60 + seconds
+                    entries.append((total, text))
+    except FileNotFoundError:
+        print(f"Error: .lrc file not found at: {lrc_path}")
+        sys.exit(2)
+    except Exception as e:
+        print(f"Error reading .lrc file: {e}")
+        sys.exit(2)
+
+    entries.sort(key=lambda x: x[0])
+    return entries
+
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def center_display(text):
+    try:
+        terminal_width, terminal_height = os.get_terminal_size()
+    except OSError:
+        terminal_width, terminal_height = 80, 24
+
+    lines = text.splitlines()
+    max_width = max((len(l) for l in lines), default=0)
+    horizontal_padding = max((terminal_width - max_width) // 2, 0)
+    vertical_padding = max((terminal_height - len(lines)) // 2, 0)
+
+    print("\n" * vertical_padding, end="")
+    for line in lines:
+        print(" " * horizontal_padding + line)
+
+
+def build_player_cmd(player, audio_path):
+    player = (player or 'play').strip()
+    if player == 'ffplay':
+        return ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_path]
+    elif player == 'mpv':
+        return ['mpv', '--no-video', '--really-quiet', audio_path]
+    else:
+        # default to sox/play
+        return ['play', audio_path]
+
+
+def play_audio(player_cmd):
+    try:
+        p = subprocess.Popen(player_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return p
+    except FileNotFoundError:
+        print(f"Error: audio player not found: {player_cmd[0]}")
+        return None
+    except Exception as e:
+        print(f"Error launching audio player: {e}")
+        return None
+
+
+def display_loop(lyrics_entries):
+    if not lyrics_entries:
+        print("No lyrics to display.")
+        return
+
+    start_time = time.time()
+    first_ts = lyrics_entries[0][0]
+
+    # countdown to first timestamp
+    while True:
+        elapsed = time.time() - start_time
+        remaining = first_ts - elapsed
+        if remaining <= 0:
+            break
+        clear_screen()
+        countdown_number = str(math.ceil(remaining))
+        center_display(countdown_number)
+        time.sleep(0.1)
+
+    # display each lyric line at its timestamp
+    for timestamp, text in lyrics_entries:
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed >= timestamp:
+                break
+            time.sleep(0.05)
+        clear_screen()
+        center_display(text)
+
+    # slight pause so the last lyric isn't immediately cleared
+    time.sleep(0.5)
+
+
+def prompt_file_path(prompt_msg):
+    while True:
+        p = input(prompt_msg).strip()
+        if not p:
+            print("Path cannot be empty. Please try again.")
+            continue
+        if not os.path.isfile(p):
+            print(f"File not found: {p}")
+            try_again = input("Try again? (Y/n): ").strip().lower()
+            if try_again in ('', 'y', 'yes'):
+                continue
+            else:
+                print("Exiting.")
+                sys.exit(1)
+        return p
+
+
+def prompt_loop_count():
+    while True:
+        v = input("How many times to play? (default 1, enter 0 for infinite loop): ").strip()
+        if v == '':
+            return 1
+        try:
+            n = int(v)
+            if n < 0:
+                print("Please enter 0 for infinite or a positive integer.")
+                continue
+            if n == 0:
+                return None  # represent infinite with None
+            return n
+        except ValueError:
+            print("Invalid number. Please enter an integer (e.g., 1, 2, 0).")
+
+
+def prompt_player_choice():
+    v = input("Audio player to use [play] (options: play, ffplay, mpv): ").strip()
+    return v or 'play'
+
+
+def sigint_handler_factory(current_proc_container):
+    def handler(signum, frame):
+        p = current_proc_container.get('proc')
+        if p and p.poll() is None:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+        print("\nInterrupted. Exiting.")
+        sys.exit(1)
+    return handler
+
+
+def main():
+    print("synced-lyrics v2 - interactive mode (no command-line flags)\n")
+
+    audio_path = prompt_file_path("Enter audio file path: ")
+    lrc_path = prompt_file_path("Enter .lrc file path: ")
+
+    lyrics = parse_lrc(lrc_path)
+    loop_count = prompt_loop_count()
+    player_choice = prompt_player_choice()
+
+    player_cmd_template = build_player_cmd(player_choice, audio_path)
+
+    from shutil import which
+    if which(player_cmd_template[0]) is None:
+        print(f"Warning: player '{player_cmd_template[0]}' not found in PATH. The script will attempt to run it, but it may fail.")
+
+    # container to hold current audio process for signal handler closure
+    current_proc = {'proc': None}
+    signal.signal(signal.SIGINT, sigint_handler_factory(current_proc))
+
+    try:
+        while True:
+            # build actual command (rebuild to include the audio_path in case user used a wrapper)
+            player_cmd = build_player_cmd(player_choice, audio_path)
+
+            audio_proc = play_audio(player_cmd)
+            current_proc['proc'] = audio_proc
+
+            # show the lyrics synced to process start
+            display_loop(lyrics)
+
+            # Wait for the audio to finish naturally before looping or exiting
+            if audio_proc and audio_proc.poll() is None:
+                try:
+                    audio_proc.wait()
+                except KeyboardInterrupt:
+                    # signal handler will handle cleanup and exit
+                    signal.raise_signal(signal.SIGINT)
+
+            current_proc['proc'] = None
+
+            # loop control
+            if loop_count is None:
+                # infinite
+                continue
+            else:
+                loop_count -= 1
+                if loop_count <= 0:
+                    break
+
+    except KeyboardInterrupt:
+        # ensure audio is cleaned up
+        p = current_proc.get('proc')
+        if p and p.poll() is None:
+            try:
+                p.terminate()
+            except Exception:
+                pass
+        print("\nExiting.")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

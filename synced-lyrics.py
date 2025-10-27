@@ -196,14 +196,19 @@ def main():
             else:
                 audio_proc = None
 
+            # Run the lyric display synchronized to the start time.
             display_loop(lyrics)
 
+            # WAIT for the audio to finish naturally before proceeding to loop/exit.
+            # This ensures we don't stop/loop while the audio is still playing.
             if audio_proc and audio_proc.poll() is None:
                 try:
-                    audio_proc.terminate()
-                except Exception:
-                    pass
+                    audio_proc.wait()
+                except KeyboardInterrupt:
+                    # If user hits Ctrl+C while waiting, clean up and exit.
+                    sigint_handler(None, None)
 
+            # If loop_count is None -> infinite
             if loop_count is None:
                 continue
             else:

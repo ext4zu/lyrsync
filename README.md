@@ -20,6 +20,8 @@ python synced-lyrics.py
 
 ---
 
+## NEW: Use synced-itv for interactive version!
+
 ## How to use
 
 Basic usage with SoX (default):

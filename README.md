@@ -2,6 +2,8 @@
 
 **Synced lyrics for your terminal!**
 
+## NEW: Use synced-itv for interactive version!
+
 ---
 
 ## Requirements
@@ -20,7 +22,6 @@ python synced-lyrics.py
 
 ---
 
-## NEW: Use synced-itv for interactive version!
 
 ## How to use
 

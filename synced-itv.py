@@ -152,33 +152,60 @@ def prompt_file_path(prompt_msg):
             print("Path cannot be empty. Please try again.")
             continue
 
-        # shlex.split handles quoted strings and escaped spaces properly.
-        # If user pasted multiple tokens, take the first parsed token as the file path.
+        # Prepare a list of candidate interpretations of the user's input.
+        # Try the raw input first (in case it already contains spaces as-is),
+        # then some common transformations (strip surrounding quotes, unescape spaces),
+        # then results from shlex.split (first token and joined tokens).
+        candidates = []
+
+        candidates.append(raw)
+        candidates.append(raw.strip('"').strip("'"))
+        candidates.append(raw.replace('\\ ', ' '))  # unescape spaces if user pasted escaped ones
+
         try:
             tokens = shlex.split(raw)
         except Exception:
-            # fallback: naive strip of surrounding quotes
-            tokens = [raw.strip('"').strip("'")]
+            tokens = []
 
-        p = tokens[0] if tokens else raw
+        if tokens:
+            candidates.append(' '.join(tokens))  # re-join tokens (useful if shlex removed escapes)
+            candidates.append(tokens[0])
 
-        # Remove surrounding single/double quotes if any remain
-        if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
-            p = p[1:-1]
+        # Remove duplicates while preserving order
+        seen = set()
+        filtered = []
+        for c in candidates:
+            if c is None:
+                continue
+            cc = c.strip()
+            if cc == '':
+                continue
+            if cc not in seen:
+                seen.add(cc)
+                filtered.append(cc)
 
-        # Expand ~ and environment variables
-        p = os.path.expanduser(os.path.expandvars(p))
+        found = False
+        for candidate in filtered:
+            p = candidate
+            # Remove surrounding single/double quotes if any remain
+            if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
+                p = p[1:-1]
 
-        if p == '':
-            print("Path cannot be empty. Please try again.")
-            continue
+            # Expand ~ and environment variables
+            p = os.path.expanduser(os.path.expandvars(p))
 
-        if not os.path.isfile(p):
-            print(f"File not found: {p}")
-            print("Please re-enter the path.")
-            continue
+            if p == '':
+                continue
 
-        return p
+            if os.path.isfile(p):
+                return p
+
+        # If we get here no candidate worked
+        print(f"File not found. Tried these forms:")
+        for c in filtered:
+            print(f"  {c}")
+        print("Please re-enter the path.")
+        continue
 
 
 def prompt_loop_count():

@@ -64,11 +64,6 @@ python sync_lyrics.py --audio song.mp3 --lyrics song.lrc
 ## 🤝 Contributing
 Contributions are welcome! If you spot an issue or want to improve the README (for example, to include exact usage or more examples), please open an issue or submit a pull request.
 
-If you'd like, I can:
-- Add badges (CI, PyPI) — if you tell me the services
-- Add a detailed example using the exact script/flags present in the repo
-- Commit this README directly to the repository (just tell me to apply)
-
 ---
 
 ## 📄 License

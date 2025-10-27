@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""
-synced-lyrics-v2.py
-
-Interactive version (no command-line flags).
-Flow:
-  1) Prompt for audio file path (required) — supports drag-and-drop paths (quoted or escaped).
-  2) Prompt for .lrc file path (required) — supports drag-and-drop paths (quoted or escaped).
-  3) Prompt for how many times to play (default 1). Enter 0 for infinite loop.
-  4) Prompt for audio player (default 'play' - sox). Common alternatives: ffplay, mpv
-
-Adjustments in this v2:
-- Accepts drag-and-drop style paths that may be wrapped in single or double quotes, or contain escaped spaces.
-- Expands ~ and environment variables.
-- If a file is not found, the script immediately prompts the user to re-enter the path (no yes/no confirmation).
-- Still waits for the audio process to finish before looping/exiting.
-- Ctrl+C will terminate any running audio and exit cleanly.
-"""
 
 import os
 import re
@@ -86,7 +69,6 @@ def build_player_cmd(player, audio_path):
     elif player == 'mpv':
         return ['mpv', '--no-video', '--really-quiet', audio_path]
     else:
-        # default to sox/play
         return ['play', audio_path]
 
 
@@ -110,7 +92,6 @@ def display_loop(lyrics_entries):
     start_time = time.time()
     first_ts = lyrics_entries[0][0]
 
-    # countdown to first timestamp
     while True:
         elapsed = time.time() - start_time
         remaining = first_ts - elapsed
@@ -121,7 +102,6 @@ def display_loop(lyrics_entries):
         center_display(countdown_number)
         time.sleep(0.1)
 
-    # display each lyric line at its timestamp
     for timestamp, text in lyrics_entries:
         while True:
             elapsed = time.time() - start_time
@@ -131,18 +111,10 @@ def display_loop(lyrics_entries):
         clear_screen()
         center_display(text)
 
-    # slight pause so the last lyric isn't immediately cleared
     time.sleep(0.5)
 
 
 def prompt_file_path(prompt_msg):
-    """
-    Prompt for a file path from the user. Accepts drag-and-drop formats:
-    - Paths wrapped in single or double quotes: '/path/to/file' or "/path/to/file"
-    - Escaped spaces (e.g., /path/to/My\\ Song.mp3)
-    - Environment vars and ~ are expanded.
-    If the file isn't found, re-prompt immediately (no yes/no).
-    """
     while True:
         raw = input(prompt_msg)
         if raw is None:
@@ -152,15 +124,11 @@ def prompt_file_path(prompt_msg):
             print("Path cannot be empty. Please try again.")
             continue
 
-        # Prepare a list of candidate interpretations of the user's input.
-        # Try the raw input first (in case it already contains spaces as-is),
-        # then some common transformations (strip surrounding quotes, unescape spaces),
-        # then results from shlex.split (first token and joined tokens).
         candidates = []
 
         candidates.append(raw)
         candidates.append(raw.strip('"').strip("'"))
-        candidates.append(raw.replace('\\ ', ' '))  # unescape spaces if user pasted escaped ones
+        candidates.append(raw.replace('\\ ', ' '))
 
         try:
             tokens = shlex.split(raw)
@@ -168,10 +136,9 @@ def prompt_file_path(prompt_msg):
             tokens = []
 
         if tokens:
-            candidates.append(' '.join(tokens))  # re-join tokens (useful if shlex removed escapes)
+            candidates.append(' '.join(tokens))
             candidates.append(tokens[0])
 
-        # Remove duplicates while preserving order
         seen = set()
         filtered = []
         for c in candidates:
@@ -187,11 +154,9 @@ def prompt_file_path(prompt_msg):
         found = False
         for candidate in filtered:
             p = candidate
-            # Remove surrounding single/double quotes if any remain
             if (p.startswith('"') and p.endswith('"')) or (p.startswith("'") and p.endswith("'")):
                 p = p[1:-1]
 
-            # Expand ~ and environment variables
             p = os.path.expanduser(os.path.expandvars(p))
 
             if p == '':
@@ -200,7 +165,6 @@ def prompt_file_path(prompt_msg):
             if os.path.isfile(p):
                 return p
 
-        # If we get here no candidate worked
         print(f"File not found. Tried these forms:")
         for c in filtered:
             print(f"  {c}")
@@ -219,7 +183,7 @@ def prompt_loop_count():
                 print("Please enter 0 for infinite or a positive integer.")
                 continue
             if n == 0:
-                return None  # represent infinite with None
+                return None
             return n
         except ValueError:
             print("Invalid number. Please enter an integer (e.g., 1, 2, 0).")
@@ -259,34 +223,27 @@ def main():
     if which(player_cmd_template[0]) is None:
         print(f"Warning: player '{player_cmd_template[0]}' not found in PATH. The script will attempt to run it, but it may fail.")
 
-    # container to hold current audio process for signal handler closure
     current_proc = {'proc': None}
     signal.signal(signal.SIGINT, sigint_handler_factory(current_proc))
 
     try:
         while True:
-            # build actual command (rebuild to include the audio_path)
             player_cmd = build_player_cmd(player_choice, audio_path)
 
             audio_proc = play_audio(player_cmd)
             current_proc['proc'] = audio_proc
 
-            # show the lyrics synced to process start
             display_loop(lyrics)
 
-            # Wait for the audio to finish naturally before looping or exiting
             if audio_proc and audio_proc.poll() is None:
                 try:
                     audio_proc.wait()
                 except KeyboardInterrupt:
-                    # signal handler will handle cleanup and exit
                     signal.raise_signal(signal.SIGINT)
 
             current_proc['proc'] = None
 
-            # loop control
             if loop_count is None:
-                # infinite
                 continue
             else:
                 loop_count -= 1
@@ -294,7 +251,6 @@ def main():
                     break
 
     except KeyboardInterrupt:
-        # ensure audio is cleaned up
         p = current_proc.get('proc')
         if p and p.poll() is None:
             try:

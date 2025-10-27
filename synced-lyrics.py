@@ -1,171 +1,219 @@
+#!/usr/bin/env python3
+"""
+synced-lyrics.py
+
+Usage examples:
+  # Using sox (play) - no extra flags needed for the player:
+  python synced-lyrics.py -l path/to/lyrics.lrc -a path/to/song.flac --loop 2
+
+  # Using a non-sox player (provide --player):
+  python synced-lyrics.py -l lyrics.lrc -a song.mp3 --player ffplay --loop inf
+
+Features:
+- Parses standard .lrc timestamped lyrics [mm:ss.xx]
+- Accepts --lrc / -l and --audio / -a paths
+- Optional --player flag only required when not using sox/play (default is sox 'play')
+- Supports --loop N (integer) or --loop inf for infinite looping
+- Plain centered lyrics output (no color coding)
+- Ctrl+C safely terminates audio and exits
+"""
+
+import argparse
+import re
 import time
 import os
+import sys
 import math
 import subprocess
+import signal
 
-//Example song : Fashion by CORTIS
-    
-//Color coding here
-    
-colors = {
-    "Seonghyeon": "[93m",
-    "James": "[92m",
-    "Martin": "[91m",
-    "Juhoon": "[94m",
-    "Keonho": "[95m",
-    "All": "[96m",
-    "Default": "[0m"
-}
-//.lrc text here
-lyrics = [
-    (6.041, "nae ti, 5 bucks", "Keonho"),
-    (7.492, "bajineun, manwon", "Keonho"),
-    (9.05, "My vision, myeot eoks", "Keonho"),
-    (10.563, "myeot jos, Bezos", "Keonho"),
-    (12.233, "Dongmyo, Wassup", "Juhoon"),
-    (13.68, "Hongdae, Wassup", "Juhoon"),
-    (15.214, "I make them famous", "Keonho"),
-    (16.786, "I call that, Fashion", "Seonghyeon"),
-    (18.302, "Fashion, Fashion", "Seonghyeon"),
-    (19.785, "Fashion, Fashion", "Seonghyeon"),
-    (21.416, "Fashion, Fashion", "Seonghyeon"),
-    (22.915, "Fashion, Fashion", "Seonghyeon"),
-    (24.608, "nae ti, 5 bucks", "Juhoon"),
-    (26.106, "bajineun, manwon", "Juhoon"),
-    (27.638, "Let’s get it, Let’s go", "Juhoon"),
-    (29.238, "Fashion, Fashion", "Juhoon"),
-    (30.616, "angeonho, naega san ot bogo mworago malhaedo", "Martin"),
-    (32.454, "jikyeo nae gojip", "Martin"),
-    (33.599, "hureucheu jjimhaenoheun sangpume isseotdeon belteuneun", "Martin"),
-    (35.565, "now on my heori", "Martin"),
-    (36.719, "Sorry my granny", "Martin"),
-    (37.893, "yojeum wae an oni", "Martin"),
-    (38.702, "seopasin dongmyo halmeoni", "Martin"),
-    (39.772, "yeogin bihaenggi", "Martin"),
-    (41.033, "LAeseo aelbeomeul kkeutnaego", "Martin"),
-    (42.162, "meositge dorawa", "Martin"),
-    (42.933, "back on my swag", "Martin"),
-    (44.529, "oehwa talk, hwanyul olla maeil", "James"),
-    (47.603, "guje pan, Got me looking fresh", "James"),
-    (50.699, "Pull up boys, syaksyak geulgeonae", "James"),
-    (53.814, "'bintijijeoseu'", "James"),
-    (55.772, "dongmyoeseo moyeo, machi semina", "Seonghyeon"),
-    (58.887, "hongdaeeseo moyeo, urin set it off", "Seonghyeon"),
-    (61.972, "cheongdamdong hangaundekkaji spreading out", "Seonghyeon"),
-    (64.898, "Squad is on the way but we can’t wrap it up", "Seonghyeon"),
-    (67.913, "nae ti, 5 bucks", "James"),
-    (69.429, "bajineun, manwon", "James"),
-    (70.876, "My vision, myeot eoks", "James"),
-    (72.49, "myeot jos, Bezos", "James"),
-    (74.212, "Dongmyo, Wassup", "Seonghyeon"),
-    (75.675, "Hongdae, Wassup", "Seonghyeon"),
-    (77.149, "I make them famous", "James"),
-    (78.698, "I call that, Fashion", "Seonghyeon"),
-    (80.305, "Fashion, Fashion", "Seonghyeon"),
-    (81.712, "Fashion, Fashion", "Seonghyeon"),
-    (83.343, "Fashion, Fashion", "Seonghyeon"),
-    (84.843, "Fashion, Fashion", "Seonghyeon"),
-    (86.489, "nae ti, 5 bucks", "Keonho"),
-    (88.025, "bajineun, manwon", "Keonho"),
-    (89.637, "Let’s get it, Let’s go", "Juhoon"),
-    (91.139, "Fashion, Fashion", "Juhoon"),
-    (92.737, "simjangi pop out", "Martin"),
-    (94.161, "cheonnune baro cop cop", "Martin"),
-    (96.302, "guje jjambap", "Martin"),
-    (97.232, "sammawonjjari jamba", "Martin"),
-    (99.323, "Feel like rockstar", "Martin"),
-    (100.406, "hwak Met Gala-ro galla, Let’s go", "Martin"),
-    (102.544, "Top Designers,", "Martin"),
-    (103.502, "hongdae matbogo hwanjang, Fashion", "Martin"),
-    (106.029, "Come and try", "Seonghyeon"),
-    (106.834, "dongmyo saenghwareseo nan", "Seonghyeon"),
-    (108.402, "cheryeogeul mani dakkana", "Seonghyeon"),
-    (109.959, "Mosh Pit haneun beop baewonwa", "Seonghyeon"),
-    (111.459, "baewobwa, baewobwa", "James"),
-    (113.042, "neodo ppalli baewobwa", "James"),
-    (114.512, "ot mudeom sok dasi taeeona", "James"),
-    (116.139, "bintijijeoseu, came alive", "James"),
-    (117.713, "dongmyoeseo moyeo, machi semina", "Seonghyeon"),
-    (120.82, "hongdaeeseo moyeo, urin set it off", "Seonghyeon"),
-    (123.897, "cheongdamdong hangaundekkaji spreading out", "Seonghyeon"),
-    (126.89, "Squad is on the way but we can’t wrap it up", "Seonghyeon"),
-    (129.892, "nae ti, 5 bucks", "Keonho"),
-    (131.398, "bajineun, manwon", "Keonho"),
-    (132.913, "My vision, myeot eoks", "Keonho"),
-    (134.353, "myeot jos, Bezos", "Keonho"),
-    (136.065, "Dongmyo, Wassup", "Juhoon"),
-    (137.658, "Hongdae, Wassup", "Juhoon"),
-    (139.108, "I make them famous", "Keonho"),
-    (140.648, "I call that, Fashion", "Seonghyeon"),
-    (142.245, "Fashion, Fashion", "All"),
-    (143.683, "Fashion, Fashion", "All"),
-    (145.314, "Fashion, Fashion", "All"),
-    (146.767, "Fashion, Fashion", "All"),
-    (148.36, "Fashion, Fashion", "All"),
-    (149.979, "Fashion, Fashion", "All"),
-    (151.476, "Fashion, Fashion", "All"),
-    (152.927, "Fashion, Fashion", "All"),
-    (154.658, "Fashion, Fashion", "All"),
-    (156.174, "Fashion, Fashion", "All"),
-    (157.697, "Fashion, Fashion", "All"),
-    (159.301, "Fashion, Fashion", "All"),
-    (160.694, "Fashion, Fashion", "All"),
-    (162.238, "Fashion, Fashion", "All"),
-    (163.781, "Fashion, Fashion", "All"),
-    (165.44, "Fashion, Fashion", "All")
-]
+TIMESTAMP_RE = re.compile(r'\[(\d+):([0-5]?\d(?:\.\d+)?)\]')
+
+
+def parse_lrc(lrc_path):
+    entries = []
+    try:
+        with open(lrc_path, 'r', encoding='utf-8') as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    continue
+                timestamps = TIMESTAMP_RE.findall(line)
+                if not timestamps:
+                    continue
+                text = TIMESTAMP_RE.sub('', line).strip()
+                if not text:
+                    continue
+                for m in timestamps:
+                    minutes = int(m[0])
+                    seconds = float(m[1])
+                    total = minutes * 60 + seconds
+                    entries.append((total, text))
+    except FileNotFoundError:
+        print(f"Error: .lrc file not found at: {lrc_path}")
+        sys.exit(2)
+    except Exception as e:
+        print(f"Error reading .lrc file: {e}")
+        sys.exit(2)
+
+    entries.sort(key=lambda x: x[0])
+    return entries
+
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def display_lyrics():
-    flac_file_path = "/audio/path/here"
 
-    input("Press Enter to start...")
-    
+def center_display(text):
     try:
-        audio_process = subprocess.Popen(["play", flac_file_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        terminal_width, terminal_height = os.get_terminal_size()
+    except OSError:
+        terminal_width, terminal_height = 80, 24
+
+    lines = text.splitlines()
+    max_width = max((len(l) for l in lines), default=0)
+    horizontal_padding = max((terminal_width - max_width) // 2, 0)
+    vertical_padding = max((terminal_height - len(lines)) // 2, 0)
+
+    print("\n" * vertical_padding, end="")
+    for line in lines:
+        print(" " * horizontal_padding + line)
+
+
+def build_player_cmd(player, audio_path):
+    if player == 'ffplay':
+        return ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', audio_path]
+    elif player == 'mpv':
+        return ['mpv', '--no-video', '--really-quiet', audio_path]
+    else:
+        # default to sox/play
+        return ['play', audio_path]
+
+
+def play_audio(player_cmd):
+    try:
+        p = subprocess.Popen(player_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return p
     except FileNotFoundError:
-        print(f"Error: The 'play' command is not found. Please install 'sox'.")
-        return
+        print(f"Error: audio player not found: {player_cmd[0]}")
+        return None
     except Exception as e:
-        print(f"Error playing audio: {e}")
+        print(f"Error launching audio player: {e}")
+        return None
+
+
+def display_loop(lyrics_entries):
+    if not lyrics_entries:
+        print("No lyrics to display.")
         return
 
     start_time = time.time()
-    first_lyric_time = lyrics[0][0]
+    first_ts = lyrics_entries[0][0]
 
-    while time.time() - start_time < first_lyric_time:
-        remaining_time = first_lyric_time - (time.time() - start_time)
-        if remaining_time > 0:
-            clear_screen()
-            terminal_width, terminal_height = os.get_terminal_size()
-            countdown_number = str(math.ceil(remaining_time))
-            horizontal_padding = (terminal_width - len(countdown_number)) // 2
-            vertical_padding = (terminal_height - 1) // 2
-            print("
-" * vertical_padding, end="")
-            print(" " * horizontal_padding + countdown_number)
-            time.sleep(0.1)
-
-    for i, (timestamp, line, member) in enumerate(lyrics):
-        while time.time() - start_time < timestamp:
-            time.sleep(0.1)
-        
+    while True:
+        elapsed = time.time() - start_time
+        remaining = first_ts - elapsed
+        if remaining <= 0:
+            break
         clear_screen()
-        terminal_width, terminal_height = os.get_terminal_size()
-        
-        color = colors.get(member, colors["Default"])
-        colored_line = f"{color}{line}{colors['Default']}"
-        
-        horizontal_padding = (terminal_width - len(line)) // 2
-        vertical_padding = (terminal_height - 1) // 2
+        countdown_number = str(math.ceil(remaining))
+        center_display(countdown_number)
+        time.sleep(0.1)
 
-        print("
-" * vertical_padding, end="")
-        print(" " * horizontal_padding + colored_line)
+    for timestamp, text in lyrics_entries:
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed >= timestamp:
+                break
+            time.sleep(0.05)
+        clear_screen()
+        center_display(text)
 
-    audio_process.terminate()
+    time.sleep(0.5)
+
+
+def parse_loop_value(loop_value):
+    if loop_value is None:
+        return 1
+    v = str(loop_value).strip().lower()
+    if v in ('inf', 'infinite', '0', '-1'):
+        return None
+    try:
+        n = int(v)
+        if n <= 0:
+            return None
+        return n
+    except Exception:
+        return None
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Display synced lyrics from a .lrc file while playing audio.")
+    parser.add_argument('-l', '--lrc', required=True, help="Path to .lrc file with timestamps.")
+    parser.add_argument('-a', '--audio', required=False, help="Path to audio file (optional). If not provided, lyrics will display without audio.")
+    parser.add_argument('--player', default=None, help="(Optional) Player command to use if not using sox/play. Examples: ffplay, mpv")
+    parser.add_argument('--loop', default='1', help="How many times to play/loop: integer or 'inf' for infinite (default 1).")
+    args = parser.parse_args()
+
+    lyrics = parse_lrc(args.lrc)
+    loop_count = parse_loop_value(args.loop)
+
+    player_cmd_template = None
+    if args.audio:
+        # If user didn't supply --player, assume sox 'play' without requiring flag
+        chosen_player = args.player if args.player else 'play'
+        player_cmd_template = build_player_cmd(chosen_player, args.audio)
+
+        # Only pre-check existence if user explicitly provided a non-sox player
+        if args.player:
+            from shutil import which
+            if which(player_cmd_template[0]) is None:
+                print(f"Warning: player '{player_cmd_template[0]}' not found in PATH. You may need to install it or choose another --player.")
+                # We continue; play_audio will handle failure when launching.
+
+    audio_processes = []
+
+    def sigint_handler(signum, frame):
+        for p in audio_processes:
+            if p and p.poll() is None:
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
+        print("\nInterrupted. Exiting.")
+        sys.exit(1)
+
+    signal.signal(signal.SIGINT, sigint_handler)
+
+    try:
+        while True:
+            if player_cmd_template:
+                audio_proc = play_audio(player_cmd_template)
+                if audio_proc:
+                    audio_processes.append(audio_proc)
+                else:
+                    audio_proc = None
+            else:
+                audio_proc = None
+
+            display_loop(lyrics)
+
+            if audio_proc and audio_proc.poll() is None:
+                try:
+                    audio_proc.terminate()
+                except Exception:
+                    pass
+
+            if loop_count is None:
+                continue
+            else:
+                loop_count -= 1
+                if loop_count <= 0:
+                    break
+
+    except KeyboardInterrupt:
+        sigint_handler(None, None)
+
 
 if __name__ == "__main__":
-    display_lyrics()
+    main()

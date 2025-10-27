@@ -15,10 +15,6 @@
 ```bash
 git clone https://github.com/zhu-ha/synced-lyrics.git
 cd synced-lyrics
-```
-2. Install Python dependencies (if available):
-```bash
-pip install -r requirements.txt
+python synced-lyrics.py
 ```
 
----

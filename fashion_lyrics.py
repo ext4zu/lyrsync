@@ -6,6 +6,7 @@ import subprocess
 //Example song : Fashion by CORTIS
     
 //Color coding here
+    
 colors = {
     "Seonghyeon": "[93m",
     "James": "[92m",

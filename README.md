@@ -73,11 +73,3 @@ python synced-lyrics.py -l path/to/lyrics.lrc
 ```
 - Lines with multiple timestamps create multiple synchronized entries.
 
-Notes
-
-- If the audio player introduces startup latency you can use a different player (mpv/ffplay) or request an offset feature to fine-tune synchronization.
-- The script centers plain lyrics in the terminal and does not use color coding.
-
----
-
-Feel free to open an issue if you'd like me to add example .lrc files, recommend SoX installation steps for different OSes, or add a sample usage section with screenshots.

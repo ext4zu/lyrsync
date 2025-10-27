@@ -64,12 +64,3 @@ Display lyrics without audio:
 python synced-lyrics.py -l path/to/lyrics.lrc
 ```
 
-.lrc format
-
-- The script parses standard .lrc timestamp lines like:
-```
-[00:12.34]This is the lyric line
-[00:45.00][00:47.50]Repeated-lyric for multiple timestamps
-```
-- Lines with multiple timestamps create multiple synchronized entries.
-

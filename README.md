@@ -13,7 +13,7 @@ Supports most audio formats and auto-detects available players like **mpv**, **f
 
 ---
 
-## Installation
+## Usage
 
 Clone the repository and run the script:
 ```bash
@@ -21,16 +21,6 @@ git clone https://github.com/ext4zu/lyrsync.git
 cd lyrsync
 python3 lyrsync.py
 ```
-
----
-
-## Usage
-
-Run the script interactively from your terminal:
-```bash
-python3 lyrsync.py
-```
-
 ### Steps
 
 1. Enter the **audio file path** (drag and drop or type manually).  

@@ -17,7 +17,7 @@ Supports most audio formats and auto-detects available players like **mpv**, **f
 
 Clone the repository and run the script:
 ```bash
-git clone https://github.com/yourname/lyrsync.git
+git clone https://github.com/ext4zu/lyrsync.git
 cd lyrsync
 python3 lyrsync.py
 ```

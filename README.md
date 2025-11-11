@@ -1,14 +1,15 @@
-# synced-lyrics - Terminal-Based Synced Lyrics Viewer
+# lyrsync - Terminal Synced Lyrics Viewer
 
-A command-line tool for displaying synced lyrics alongside audio playback.  
-Supports `.lrc` files and any audio format playable by your system.
+A command-line tool for displaying time-synced `.lrc` lyrics in your terminal alongside audio playback.  
+Supports most audio formats and auto-detects available players like **mpv**, **ffplay**, **vlc**, **afplay**, and **sox**.
 
 ---
 
 ## Requirements
 
 - Python 3.7 or later  
-- Any audio player (e.g., SoX, VLC)
+- At least one audio player installed and available in your system `PATH`:
+  - `mpv`, `ffplay`, `afplay`, `vlc`, `cvlc`, `mplayer`, or `play` (SoX)
 
 ---
 
@@ -16,37 +17,57 @@ Supports `.lrc` files and any audio format playable by your system.
 
 Clone the repository and run the script:
 ```bash
-git clone https://github.com/zhu-ha/synced-lyrics.git
-cd synced-lyrics
-python synced-lyrics.py
+git clone https://github.com/yourname/lyrsync.git
+cd lyrsync
+python3 lyrsync.py
 ```
 
 ---
 
 ## Usage
 
-Run the script with flags to specify your lyrics and audio files:
+Run the script interactively from your terminal:
 ```bash
-python synced-lyrics.py -l path/to/lyrics.lrc -a path/to/song.flac
+python3 lyrsync.py
 ```
 
-### Options
+### Steps
 
-- `--loop 2` : Loop playback and lyrics display twice  
-- `--loop inf` : Loop indefinitely until manually stopped
+1. Enter the **audio file path** (drag and drop or type manually).  
+2. Enter the **.lrc lyrics file path**.  
+3. Specify how many times to play:
+   - `1` for single playback  
+   - `0` for infinite loop  
+   - Any positive integer for repeated playback  
+4. The lyrics will be displayed in sync with the audio, centered in your terminal.
 
-Place your `.lrc` and audio files anywhere on your system. The script accepts full paths to both.
+---
+
+## Supported Players
+
+The script auto-detects and uses the first available player from this list:
+
+| Player     | Notes                          |
+|------------|--------------------------------|
+| mpv        | Recommended for most systems   |
+| ffplay     | Lightweight and fast           |
+| afplay     | macOS built-in                 |
+| vlc/cvlc   | Cross-platform support         |
+| mplayer    | Terminal-friendly              |
+| play       | Provided by SoX                |
 
 ---
 
 ## Notes
 
-- Audio playback is optional; lyrics will display even without an audio file.  
-- Compatible with any player that can be invoked from the command line.  
-- For an interactive version, use the companion tool `synced-itv`.
+- `.lrc` files must contain valid timestamped lyrics.  
+- The script attempts multiple path formats to resolve user input.  
+- If no player is found, it defaults to `play` (SoX), which may fail if not installed.  
+- Lyrics are displayed with countdown and centered formatting for readability.  
+- You can interrupt playback anytime with `Ctrl + C`.
 
 ---
 
 ## Exit
 
-Press `Ctrl + C` to stop playback and exit the program at any time.
+Press `Ctrl + C` to stop playback and exit the program safely.

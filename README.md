@@ -25,7 +25,7 @@ python3 lyrsync.py
 
 1. Enter the **audio file path** (drag and drop or type manually).  
 2. Enter the **.lrc lyrics file path**.  
-3. Specify how many times to play:
+3. Specify how many times to play OR;
    - `1` for single playback  
    - `0` for infinite loop  
    - Any positive integer for repeated playback  

@@ -1,6 +1,4 @@
-# synced-lyrics
-
-**Synced lyrics for your terminal!**
+# synced-lyrics - Synced Lyrics for Your Terminal
 
 ## NEW: Use synced-itv for interactive version!
 
